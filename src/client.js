@@ -6,9 +6,10 @@ const { createDeserializer, createSerializer } = require('./transforms/serialize
 const { NethernetClient } = require('./nethernet.js')
 const { NethernetJSONRPC } = require('./websocket/signal-jsonrpc.js')
 
+const { v4 } = require('uuid')
+
 const JWT = require('jsonwebtoken')
 const crypto = require('crypto')
-const { v3, v4, NIL } = require('uuid')
 
 const steve = require("./skins/Steve.json")
 
@@ -44,7 +45,7 @@ class Client extends Connection {
 
         this.connection.nethernet.credentials = this.nethernet.signalling.credentials
         this.connection.nethernet.signalHandler = this.nethernet.signalling.write.bind(this.nethernet.signalling)
-        this.nethernet.signalling.on('signal', signal => 
+        this.nethernet.signalling.on('signal', signal =>
             this.connection.nethernet.handleSignal(signal)
                 .catch(error => this.close(error.message))
         )
@@ -58,7 +59,8 @@ class Client extends Connection {
     connect() {
         if (!this.connection || !this.nethernet.signalling) throw new Error('Connect not currently allowed')
 
-        this.connection.onConnected = () => this.write('request_network_settings', { client_protocol: this.options?.protocolVersion || 2169 });
+        this.connection.onConnected = () => 
+            this.write('request_network_settings', { client_protocol: this.options?.protocolVersion || 2193 });
 
         this.connection.onCloseConnection = (reason) => { this.close(reason) }
         this.connection.onEncapsulated = this.onEncapsulated
@@ -70,73 +72,63 @@ class Client extends Connection {
     }
 
     sendLogin() {
-        const sign = data => JWT.sign(data, this.ecdhKeyPair.privateKey, { algorithm: 'ES384', header: { x5u: this.clientX509 } })
+        const PlayFabId = String(this.tokenData?.mid || "aed7e8a4d485a49a").toLowerCase()
 
-        let packet = {
-            protocol_version: this.options?.protocolVersion || 2169,
+        const payload = {
+            ClientRandomId: String(Date.now()),
+            GameVersion: this.options?.version || "1.26.45",
+            CurrentInputMode: 2,
+            DefaultInputMode: 2,
+
+            SelfSignedId: "",
+            GUIScale: -1,
+            LanguageCode: ["en_US", "en_GB"][Math.floor(Math.random() * 2)],
+
+            DeviceId: v4().replace(/-/g, ""),
+            DeviceOS: 1,
+            DeviceModel: "SAMSUNG SM-G955U",
+            UIProfile: 1,
+            MaxViewDistance: 10,
+            MemoryTier: 3,
+            PlatformType: 1,
+
+            GraphicsMode: 1,
+            TrustedSkin: steve.PersonaSkin,
+            OverrideSkin: false,
+            FilterProfanity: false,
+
+            ThirdPartyName: this.tokenData?.xname || "Meow meow.",
+            ProfileHash: "",
+
+            PlatformOnlineId: "",
+            PlatformOfflineId: "",
+
+            IsEduMode: false,
+            TenantId: null,
+            ADRole: null,
+
+            IsEditorMode: false,
+            ClientIsEditorCapable: true,
+            ClientEditorConnectionIntent: 2,
+
+            CompatibleWithClientSideChunkGen: true,
+            ...steve,
+            ...this.options?.skinData
+        }
+
+        const updatePlayFabId = data => btoa(atob(data).replaceAll('aed7e8a4d485a49a-5', `${PlayFabId}-2`))
+
+        payload.SkinId = `persona-${PlayFabId}-2`
+        payload.SkinGeometryData = updatePlayFabId(payload.SkinGeometryData)
+        payload.SkinResourcePatch = updatePlayFabId(payload.SkinResourcePatch)
+
+        this.write('login', {
+            protocol_version: this.options?.protocolVersion || 2193,
             tokens: {
                 identity: JSON.stringify({ AuthenticationType: 0, Certificate: undefined, Token: this.token }),
-                client: sign({ ClientRandomId: "Meow" })
+                client: JWT.sign(payload, this.ecdhKeyPair.privateKey, { algorithm: 'ES384', header: { x5u: this.clientX509 } })
             }
-        }
-
-        try {
-            const PlayFabId = String(this.tokenData?.mid || "aed7e8a4d485a49a").toLowerCase()
-
-            const payload = {
-                ClientRandomId: "Meow",
-                GameVersion: this.options?.version || "1.26.45",
-                CurrentInputMode: 2,
-                DefaultInputMode: 2,
-
-                SelfSignedId: "",
-                GUIScale: -1,
-                LanguageCode: ["en_US", "en_GB"][Math.floor(Math.random() * 2)],
-
-                DeviceId: v4().replace(/-/g, ""),
-                DeviceOS: 1,
-                DeviceModel: "SAMSUNG SM-G955U",
-                UIProfile: 1,
-                MaxViewDistance: 10,
-                MemoryTier: 3,
-                PlatformType: 1,
-
-                GraphicsMode: 1,
-                TrustedSkin: steve.PersonaSkin,
-                OverrideSkin: false,
-                FilterProfanity: false,
-
-                ThirdPartyName: this.tokenData?.xname || "Meow meow.",
-                ProfileHash: "",
-
-                PlatformOnlineId: "",
-                PlatformOfflineId: "",
-
-                IsEduMode: false,
-                TenantId: null,
-                ADRole: null,
-
-                IsEditorMode: false,
-                ClientIsEditorCapable: true,
-                ClientEditorConnectionIntent: 2,
-
-                CompatibleWithClientSideChunkGen: true,
-                ...steve,
-                ...this.options?.skinData
-            }
-
-            const updatePlayFabId = data => btoa(atob(data).replaceAll('aed7e8a4d485a49a-5', `${PlayFabId}-2`))
-
-            payload.SkinId = `persona-${PlayFabId}-2`
-            payload.SkinGeometryData = updatePlayFabId(payload.SkinGeometryData)
-            payload.SkinResourcePatch = updatePlayFabId(payload.SkinResourcePatch)
-
-            packet.tokens.client = sign(payload)
-        } catch (error) {
-            console.log(error)
-        }
-
-        this.write('login', packet)
+        })
     }
 
     disconnect(reason = 'Client leaving') {

@@ -13,6 +13,7 @@ if (!code) throw new Error('Please provide a realm code')
     });
 
     await flow.getXboxToken()
+        .catch(() => {});
 
     const api = new Realm(flow)
     await api.init()

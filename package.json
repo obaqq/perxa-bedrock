@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Minecraft Bedrock protocol implementation with a JSON-RPC/WebSocket NetherNet transport",
   "main": "index.js",
-  "types": "index.d.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -19,11 +18,5 @@
     "prismarine-nbt": "^2.7.0",
     "protodef": "^1.19.0",
     "ws": "^8.18.3"
-  },
-  "exports": {
-    ".": {
-      "require": "./index.js",
-      "types": "./index.d.ts"
-    }
   }
 }
