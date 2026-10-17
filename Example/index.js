@@ -1,9 +1,11 @@
 const { Authflow } = require('prismarine-auth')
+
 const Realm = require('./Classes/Realm')
 const Client = require('./Classes/Client')
 
-const code = process.argv[2]
-if (!code) throw new Error('Please provide a realm code')
+const code = process.argv[2];
+if (!code) 
+    throw new Error('Please provide a realm code');
 
 ;(async () => {
     const flow = new Authflow(null, './Cache', {
@@ -20,7 +22,7 @@ if (!code) throw new Error('Please provide a realm code')
 
     const { body = null } = await api.getRealmInfo(code, false);
         // to get realmAddress (below) we need to be a member of the realm. (hence the *false*)
-    if (!body?.id) throw new Error(`Realm not found: ${body}`)
+    if (!body?.id) throw new Error(`Realm not found: ${body}`);
 
     console.log(`Realm: ${body.name}`);
 
